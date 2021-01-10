@@ -28,6 +28,8 @@ var (
 
 	// EmptyMuHashHash is the hash of `NewMuHash().Finalize()`
 	EmptyMuHashHash = Hash{0x32, 0x9d, 0x0a, 0x9d, 0x0c, 0xe1, 0x81, 0x7a, 0xa8, 0x82, 0xf8, 0x09, 0x35, 0xf2, 0x6e, 0x72, 0x4b, 0x0d, 0x6f, 0x7c, 0xe7, 0x9e, 0xeb, 0x3f, 0x5d, 0x20, 0x1a, 0x5a, 0xd9, 0x9e, 0x9b, 0x1c}
+
+	errOverflow = errors.New("Overflow in the MuHash field")
 )
 
 // Hash is a type encapsulating the result of hashing some unknown sized data.
@@ -99,6 +101,7 @@ func (mu MuHash) Reset() {
 	mu.denominator.SetUint64(1)
 }
 
+// Clone the muhash to create a new one
 func (mu MuHash) Clone() MuHash {
 	return MuHash{
 		numerator:   new(big.Int).Set(mu.numerator),
@@ -118,6 +121,10 @@ func (mu MuHash) Add(data []byte) {
 // Supports arbitrary length data (subject to the underlying hash function(Blake2b) limits)
 func (mu MuHash) Remove(data []byte) {
 	element := dataToElement(data)
+	mu.removeElement(element)
+}
+
+func (mu MuHash) removeElement(element *big.Int) {
 	mu.denominator.Mul(mu.denominator, element)
 	mu.denominator.Mod(mu.denominator, prime)
 }
@@ -167,7 +174,7 @@ func DeserializeMuHash(serialized *SerializedMuHash) (*MuHash, error) {
 	bytesToWordsLE((*[elementByteSize]byte)(serialized), &b)
 	numerator := new(big.Int).SetBits(b[:])
 	if numerator.Cmp(prime) >= 0 {
-		return nil, errors.New("Overflow in the MuHash field")
+		return nil, errOverflow
 	}
 
 	return &MuHash{
@@ -176,6 +183,9 @@ func DeserializeMuHash(serialized *SerializedMuHash) (*MuHash, error) {
 	}, nil
 }
 
+// Finalize will return a hash(blake2b) of the multiset.
+// Because the returned value is a hash of a multiset you cannot "Un-Finalize" it.
+// If this is meant for storage then Serialize should be used instead.
 func (mu MuHash) Finalize() *Hash {
 	ret := Hash(blake2b.Sum256(mu.Serialize()[:]))
 	return &ret
