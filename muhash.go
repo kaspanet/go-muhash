@@ -1,3 +1,6 @@
+// Package muhash provides an implementation of a Multiplicative Hash,
+// a cryptographic data structure that allows you to have a rolling hash function
+// that you can add and remove elements from, without the need to re-serialize and re-hash the whole data set.
 package muhash
 
 import (

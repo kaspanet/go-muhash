@@ -204,7 +204,7 @@ func TestMuHash_Serialize(t *testing.T) {
 		t.Fatalf("Failed copying %x into SerializedMuHash", overflow)
 	}
 
-	deserialized, err = DeserializeMuHash(serialized)
+	_, err = DeserializeMuHash(serialized)
 	if !errors.Is(err, errOverflow) {
 		t.Fatalf("Expected %s, instead found: %s", errOverflow, err)
 	}
