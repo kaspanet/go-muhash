@@ -1,6 +1,7 @@
 package muhash
 
 import (
+	"bytes"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -47,7 +48,7 @@ var (
 func TestMain(m *testing.M) {
 	for _, vector := range testVectorsStrings {
 		res := testVector{}
-		err := errors.New("")
+		var err error
 		res.dataElement, err = hex.DecodeString(vector.dataElementHex)
 		if err != nil {
 			panic(fmt.Sprintf("failed parsing the hex: '%s', err: '%s'", vector.dataElementHex, err))
@@ -91,6 +92,123 @@ func TestMain(m *testing.M) {
 	}
 
 	os.Exit(m.Run())
+}
+
+func elementFromByte(i byte) []byte {
+	out := [32]byte{i}
+	return out[:]
+}
+
+func TestRandomMuHashArithmetic(t *testing.T) {
+
+	r := rand.New(rand.NewSource(1))
+	for i := 0; i < 10; i++ {
+		var res *Hash
+		var table [4]byte
+		for i := 0; i < 4; i++ {
+			table[i] = byte(r.Int31n(1 << 3)) // [0, 2^3) can't overflow byte.
+		}
+		for order := 0; order < 4; order++ {
+			acc := NewMuHash()
+			for i := 0; i < 4; i++ {
+				t := table[i^order]
+				if (t & 4) == 1 {
+					acc.Remove(elementFromByte(t & 3))
+				} else {
+					acc.Add(elementFromByte(t & 3))
+				}
+			}
+			out := acc.Finalize()
+			if order == 0 {
+				res = out
+			} else {
+				if !res.IsEqual(out) {
+					t.Fatalf("Expected %s == %s", res, out)
+				}
+			}
+		}
+
+		x := elementFromByte(byte(r.Int31n(1 << 3))) // x=X
+		y := elementFromByte(byte(r.Int31n(1 << 3))) // x=X, y=Y
+		z := NewMuHash()                             // x=X, y=X, z=1.
+		yx := NewMuHash()                            // x=X, y=X, z=1, yx=1
+		yx.Add(y)                                    // x=X, y=X, z=1, yx=Y
+		yx.Add(x)                                    // x=X, y=X, z=1, yx=Y*X
+		yx.normalize()
+
+		z.Add(x)                      // x=X, y=Y, z=X, yx=Y*X
+		z.Add(y)                      // x=X, y=Y, z=X*Y, yx = Y*X
+		z.removeElement(yx.numerator) // x=X, y=Y, z=1, yx=Y*X
+
+		if !z.Finalize().IsEqual(&EmptyMuHashHash) {
+			t.Fatalf("Expected %s == %s", z.Finalize(), EmptyMuHashHash)
+		}
+	}
+}
+
+func EqBitcoinHash(hash *Hash, str string) bool {
+	for i := len(hash)/2 - 1; i >= 0; i-- {
+		opp := len(hash) - 1 - i
+		hash[i], hash[opp] = hash[opp], hash[i]
+	}
+	return hash.String() == str
+}
+
+func TestNewPreComputed(t *testing.T) {
+
+	expected := "afd9eb8885b98062d6720cfb034886bc332b10251adc037d2a5fc4c17c11832f"
+	acc := NewMuHash()
+	acc.Add(elementFromByte(0))
+	acc.Add(elementFromByte(1))
+	acc.Remove(elementFromByte(2))
+	if acc.Finalize().String() != expected {
+		t.Fatalf("Expected %s == %s", expected, acc.Finalize())
+	}
+
+	acc = NewMuHash()
+	acc.Add(elementFromByte(0))
+	acc.Add(elementFromByte(1))
+	acc.Remove(elementFromByte(2))
+	if acc.Finalize().String() != expected {
+		t.Fatalf("Expected %s == %s", expected, acc.Finalize())
+	}
+}
+
+func TestMuHash_Serialize(t *testing.T) {
+	expected, err := hex.DecodeString("ad8b80dae66ba6c0c63c02079cdac340f26ca6614584431de4c46a46e521bc5c0e5bb7e475e2df1c501c34dfd9534731a6e631c9d4fce641da66b08a26f8ebb738e0bc8bb5ae07f9fc58bdcf790444df315a8eadc3edc8e27325623fce2e25c6d03a785eb482c9887af6b72bd757e977c958e25ea33b631c77e52713b5c66e8f8d7bdc04f50ce4cc68eca4dde3a1621de22c1634de13fdae65b43ee1caeefa71804276b84a159669e0522fde03364311bd57607e01b68b8e55d68b84c1c8e038248de9af3c7aeb16a9261edbe6ece62a14a4d770fbf006d179a9c5ca8226a5dae7e2cb81a31c3db35aa18d3a3eac994c7e9fc61ea0ebb32b49dd2a6c7e1eca086a39b9ee29fffe587e46a6d25a1df5dd285b43daf3176432a58725940067f69eb6fe8b3f80e137a2642fb8f66395cd3865a3259a4499351191335ca53d04153179717125a500c87e95493a25547bf1e96ea18d174bd857debdb10d2f33d1ce220da7ffb1e56ef5be8d6a855b5b8cea70b3dd32cf9bc533fca33d71560ac6e182")
+	if err != nil {
+		t.Fatalf("Failed deserializing hex string: %v", err)
+	}
+	check := NewMuHash()
+	check.Add(elementFromByte(1))
+	check.Add(elementFromByte(2))
+	serialized := check.Serialize()
+	if !bytes.Equal(expected, serialized[:]) {
+		t.Fatalf("Expected %x == %s", expected, serialized)
+	}
+
+	deserialized, err := DeserializeMuHash(serialized)
+	if err != nil {
+		t.Fatalf("Failed deserializing muhash: %v", err)
+	}
+	if !deserialized.Finalize().IsEqual(check.Finalize()) {
+		t.Fatalf("Expected %s == %s", deserialized.Finalize(), check.Finalize())
+	}
+
+	overflow, err := hex.DecodeString("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
+	if err != nil {
+		t.Fatalf("Failed deserializing hex string: %v", err)
+	}
+
+	if copy(serialized[:], overflow) != len(overflow) {
+		t.Fatalf("Failed copying %x into SerializedMuHash", overflow)
+	}
+
+	deserialized, err = DeserializeMuHash(serialized)
+	if !errors.Is(err, errOverflow) {
+		t.Fatalf("Expected %s, instead found: %s", errOverflow, err)
+	}
+
 }
 
 func TestVectorsMuHash_Hash(t *testing.T) {
@@ -265,7 +383,7 @@ func TestMuHashAddRemove(t *testing.T) {
 	}
 }
 
-const BenchmarkIterations = 1_000_000
+const BenchmarkIterations = 1_000_00
 
 func BenchmarkMuHash_Add(b *testing.B) {
 	b.ReportAllocs()
