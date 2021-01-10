@@ -116,6 +116,10 @@ func (mu MuHash) Clone() MuHash {
 // Supports arbitrary length data (subject to the underlying hash function(Blake2b) limits)
 func (mu MuHash) Add(data []byte) {
 	element := dataToElement(data)
+	mu.addElement(element)
+}
+
+func (mu MuHash) addElement(element *big.Int) {
 	mu.numerator.Mul(mu.numerator, element)
 	mu.numerator.Mod(mu.numerator, prime)
 }

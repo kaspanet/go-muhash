@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math/big"
 	"math/rand"
 	"os"
 	"testing"
@@ -100,7 +101,6 @@ func elementFromByte(i byte) []byte {
 }
 
 func TestRandomMuHashArithmetic(t *testing.T) {
-
 	r := rand.New(rand.NewSource(1))
 	for i := 0; i < 10; i++ {
 		var res *Hash
@@ -146,16 +146,7 @@ func TestRandomMuHashArithmetic(t *testing.T) {
 	}
 }
 
-func EqBitcoinHash(hash *Hash, str string) bool {
-	for i := len(hash)/2 - 1; i >= 0; i-- {
-		opp := len(hash) - 1 - i
-		hash[i], hash[opp] = hash[opp], hash[i]
-	}
-	return hash.String() == str
-}
-
 func TestNewPreComputed(t *testing.T) {
-
 	expected := "afd9eb8885b98062d6720cfb034886bc332b10251adc037d2a5fc4c17c11832f"
 	acc := NewMuHash()
 	acc.Add(elementFromByte(0))
@@ -209,6 +200,22 @@ func TestMuHash_Serialize(t *testing.T) {
 		t.Fatalf("Expected %s, instead found: %s", errOverflow, err)
 	}
 
+	serializedZeros := SerializedMuHash{}
+	zeroed := NewMuHash()
+	zeroed.addElement(big.NewInt(0)) // multiply by zero.
+	serialized = zeroed.Serialize()
+	if !bytes.Equal(serialized[:], serializedZeros[:]) {
+		t.Fatalf("expected serialized to be all zeros, instead found: %s", serialized)
+	}
+	deserialized, err = DeserializeMuHash(serialized)
+	if err != nil {
+		t.Fatalf("Failed deserializing zeros: %v", err)
+	}
+	zeroed.normalize()
+	deserialized.normalize()
+	if zeroed.numerator.Cmp(deserialized.numerator) != 0 {
+		t.Fatalf("Expected %s == %s", zeroed.numerator, deserialized.numerator)
+	}
 }
 
 func TestVectorsMuHash_Hash(t *testing.T) {
