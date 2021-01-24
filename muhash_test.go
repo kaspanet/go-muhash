@@ -42,8 +42,7 @@ var testVectorsStrings = []struct {
 }
 
 var (
-	benchmarkData100Bytes = make([][100]byte, BenchmarkIterations)
-	benchmarkDataMuHash   = make([]MuHash, BenchmarkIterations)
+	maxMuHash = MuHash{}
 )
 
 func TestMain(m *testing.M) {
@@ -72,24 +71,14 @@ func TestMain(m *testing.M) {
 		}
 		testVectors = append(testVectors, res)
 	}
-
-	r := rand.New(rand.NewSource(1))
-	for i := 0; i < BenchmarkIterations; i++ {
-		n, err := r.Read(benchmarkData100Bytes[i][:])
-		if err != nil || n != len(benchmarkData100Bytes[i]) {
-			panic(err)
-		}
+	var max [elementWordSize]big.Word
+	for i := range max {
+		max[i] = ^big.Word(0)
 	}
-
-	set := NewMuHash()
-	for i := 0; i < BenchmarkIterations; i++ {
-		data := [100]byte{}
-		n, err := r.Read(data[:])
-		if err != nil || n != len(data) {
-			panic(err)
-		}
-		set.Add(data[:])
-		benchmarkDataMuHash[i] = set.Clone()
+	max2 := max
+	maxMuHash = MuHash{
+		numerator:   new(big.Int).SetBits(max[:]),
+		denominator: new(big.Int).SetBits(max2[:]),
 	}
 
 	os.Exit(m.Run())
@@ -390,35 +379,104 @@ func TestMuHashAddRemove(t *testing.T) {
 	}
 }
 
-const BenchmarkIterations = 1_000_00
-
 func BenchmarkMuHash_Add(b *testing.B) {
-	b.ReportAllocs()
 	set := NewMuHash()
+	var data [100]byte
+	for i := range data {
+		data[i] = 0xFF
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		set.Add(benchmarkData100Bytes[i][:])
+		set.Add(data[:])
 	}
 }
 
 func BenchmarkMuHash_Remove(b *testing.B) {
-	b.ReportAllocs()
 	set := NewMuHash()
+	var data [100]byte
+	for i := range data {
+		data[i] = 0xFF
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		set.Remove(benchmarkData100Bytes[i][:])
+		set.Remove(data[:])
 	}
 }
 
-func BenchmarkMuHash_Combine(b *testing.B) {
-	b.ReportAllocs()
+func BenchmarkMuHash_CombineWorst(b *testing.B) {
 	set := NewMuHash()
+	b.ReportAllocs()
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		set.Combine(benchmarkDataMuHash[i])
+		set.Combine(maxMuHash)
+	}
+}
+
+func BenchmarkMuHash_CombineBest(b *testing.B) {
+	set := NewMuHash()
+	empty := NewMuHash()
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		set.Combine(empty)
+	}
+}
+
+func BenchmarkMuHash_CombineRand(b *testing.B) {
+	r := rand.New(rand.NewSource(0))
+	set := NewMuHash()
+	element := MuHash{
+		numerator:   new(big.Int).Rand(r, prime),
+		denominator: new(big.Int).Rand(r, prime),
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		set.Combine(element)
+	}
+}
+
+func BenchmarkMuHash_Clone(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		maxMuHash.Clone()
+	}
+}
+
+func BenchmarkMuHash_normalizeWorst(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		maxMuHash.Clone().normalize()
+	}
+}
+
+func BenchmarkMuHash_normalizeBest(b *testing.B) {
+	empty := NewMuHash()
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		empty.Clone().normalize()
+	}
+}
+
+func BenchmarkMuHash_normalizeRand(b *testing.B) {
+	r := rand.New(rand.NewSource(0))
+	set := MuHash{
+		numerator:   new(big.Int).Rand(r, prime),
+		denominator: new(big.Int).Rand(r, prime),
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		set.Clone().normalize()
 	}
 }
 
 func BenchmarkMuHash_Finalize(b *testing.B) {
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		benchmarkDataMuHash[i].Finalize()
+		maxMuHash.Clone().Finalize()
 	}
 }

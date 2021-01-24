@@ -23,6 +23,8 @@ const (
 	elementByteSize = elementBitSize / 8
 	elementWordSize = 3072 / bits.UintSize
 	wordSizeInBytes = bits.UintSize / 8
+
+	maxUint = ^uint(0)
 )
 
 var (
