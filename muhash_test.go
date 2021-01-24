@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"math/big"
 	"math/rand"
 	"os"
 	"testing"
@@ -71,14 +70,13 @@ func TestMain(m *testing.M) {
 		}
 		testVectors = append(testVectors, res)
 	}
-	var max [elementWordSize]big.Word
+	var max uint3072
 	for i := range max {
-		max[i] = ^big.Word(0)
+		max[i] = maxUint
 	}
-	max2 := max
 	maxMuHash = MuHash{
-		numerator:   new(big.Int).SetBits(max[:]),
-		denominator: new(big.Int).SetBits(max2[:]),
+		numerator:   max,
+		denominator: max,
 	}
 
 	os.Exit(m.Run())
@@ -125,9 +123,9 @@ func TestRandomMuHashArithmetic(t *testing.T) {
 		yx.Add(x)                                    // x=X, y=X, z=1, yx=Y*X
 		yx.normalize()
 
-		z.Add(x)                      // x=X, y=Y, z=X, yx=Y*X
-		z.Add(y)                      // x=X, y=Y, z=X*Y, yx = Y*X
-		z.removeElement(yx.numerator) // x=X, y=Y, z=1, yx=Y*X
+		z.Add(x)                       // x=X, y=Y, z=X, yx=Y*X
+		z.Add(y)                       // x=X, y=Y, z=X*Y, yx = Y*X
+		z.removeElement(&yx.numerator) // x=X, y=Y, z=1, yx=Y*X
 
 		if !z.Finalize().IsEqual(&EmptyMuHashHash) {
 			t.Fatalf("Expected %s == %s", z.Finalize(), EmptyMuHashHash)
@@ -191,7 +189,7 @@ func TestMuHash_Serialize(t *testing.T) {
 
 	serializedZeros := SerializedMuHash{}
 	zeroed := NewMuHash()
-	zeroed.addElement(big.NewInt(0)) // multiply by zero.
+	zeroed.addElement(&uint3072{}) // multiply by zero.
 	serialized = zeroed.Serialize()
 	if !bytes.Equal(serialized[:], serializedZeros[:]) {
 		t.Fatalf("expected serialized to be all zeros, instead found: %s", serialized)
@@ -202,8 +200,8 @@ func TestMuHash_Serialize(t *testing.T) {
 	}
 	zeroed.normalize()
 	deserialized.normalize()
-	if zeroed.numerator.Cmp(deserialized.numerator) != 0 {
-		t.Fatalf("Expected %s == %s", zeroed.numerator, deserialized.numerator)
+	if zeroed.numerator != deserialized.numerator {
+		t.Fatalf("Expected %x == %x", zeroed.numerator, deserialized.numerator)
 	}
 }
 
@@ -314,9 +312,10 @@ func TestParseMuHashFail(t *testing.T) {
 		opp := len(data) - 1 - i
 		data[i], data[opp] = data[opp], data[i]
 	}
+
 	_, err := DeserializeMuHash(&data)
 	if err == nil {
-		t.Errorf("shouldn't be able to parse a multiset bigger with x bigger than the field size: '%s'", err)
+		t.Fatalf("shouldn't be able to parse a multiset bigger with x bigger than the field size: '%s'", err)
 	}
 	data[0] = 0
 	_, err = DeserializeMuHash(&data)
@@ -339,15 +338,15 @@ func TestMuHash_Reset(t *testing.T) {
 	data := [100]byte{}
 	n, err := r.Read(data[:])
 	if err != nil || n != len(data) {
-		t.Fatalf("failed generating random data '%x' '%d' ", err, n)
+		t.Fatalf("failed generating random data '%v' '%d' ", err, n)
 	}
 	set.Add(data[:])
-	if *set.Finalize() == *emptySet.Finalize() {
-		t.Errorf("expected set to be empty. found: '%x'", set.Finalize())
+	if set.Finalize().IsEqual(emptySet.Finalize()) {
+		t.Errorf("expected set to be empty. found: '%s'", set.Finalize())
 	}
 	set.Reset()
-	if *set.Finalize() != *emptySet.Finalize() {
-		t.Errorf("expected set to be empty. found: '%x'", set.Finalize())
+	if !set.Finalize().IsEqual(emptySet.Finalize()) {
+		t.Errorf("expected set to be empty. found: '%s'", set.Finalize())
 	}
 }
 
@@ -362,20 +361,20 @@ func TestMuHashAddRemove(t *testing.T) {
 		data := [100]byte{}
 		n, err := r.Read(data[:])
 		if err != nil || n != len(data) {
-			t.Fatalf("Failed generating random data. read: '%d' bytes. .'%x'", n, err)
+			t.Fatalf("Failed generating random data. read: '%d' bytes. .'%v'", n, err)
 		}
 		set.Add(data[:])
 		list[i] = data
 	}
 	if set.Finalize().IsEqual(set2.Finalize()) {
-		t.Errorf("sets are the same when they should be different: set '%x'\n", set.Finalize())
+		t.Errorf("sets are the same when they should be different: set '%s'\n", set.Finalize())
 	}
 
 	for i := 0; i < loopsN; i++ {
 		set.Remove(list[i][:])
 	}
 	if !set.Finalize().IsEqual(set2.Finalize()) {
-		t.Errorf("sets are different when they should be the same: set1: '%x', set2: '%x'\n", set.Finalize(), set2.Finalize())
+		t.Errorf("sets are different when they should be the same: set1: '%s', set2: '%s'\n", set.Finalize(), set2.Finalize())
 	}
 }
 
@@ -410,7 +409,7 @@ func BenchmarkMuHash_CombineWorst(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		set.Combine(maxMuHash)
+		set.Combine(&maxMuHash)
 	}
 }
 
@@ -427,14 +426,16 @@ func BenchmarkMuHash_CombineBest(b *testing.B) {
 func BenchmarkMuHash_CombineRand(b *testing.B) {
 	r := rand.New(rand.NewSource(0))
 	set := NewMuHash()
-	element := MuHash{
-		numerator:   new(big.Int).Rand(r, prime),
-		denominator: new(big.Int).Rand(r, prime),
+	var element MuHash
+	for i := range element.numerator {
+		element.numerator[i] = uint(r.Uint64())
+		element.denominator[i] = uint(r.Uint64())
 	}
+	element.normalize()
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		set.Combine(element)
+		set.Combine(&element)
 	}
 }
 
@@ -463,10 +464,13 @@ func BenchmarkMuHash_normalizeBest(b *testing.B) {
 
 func BenchmarkMuHash_normalizeRand(b *testing.B) {
 	r := rand.New(rand.NewSource(0))
-	set := MuHash{
-		numerator:   new(big.Int).Rand(r, prime),
-		denominator: new(big.Int).Rand(r, prime),
+	var set MuHash
+	for i := range set.numerator {
+		set.numerator[i] = uint(r.Uint64())
+		set.denominator[i] = uint(r.Uint64())
 	}
+	set.normalize()
+
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
