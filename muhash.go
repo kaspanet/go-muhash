@@ -24,12 +24,12 @@ const (
 	elementWordSize = 3072 / bits.UintSize
 	wordSizeInBytes = bits.UintSize / 8
 
-	maxUint = ^uint(0)
+	primeDiff = 1103717
 )
 
 var (
 	// 2^3072 - 1103717, the largest 3072-bit safe prime number, is used as the modulus.
-	prime = new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), 3072), big.NewInt(1103717))
+	prime = new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), 3072), big.NewInt(primeDiff))
 
 	// EmptyMuHashHash is the hash of `NewMuHash().Finalize()`
 	EmptyMuHashHash = Hash{0x32, 0x9d, 0x0a, 0x9d, 0x0c, 0xe1, 0x81, 0x7a, 0xa8, 0x82, 0xf8, 0x09, 0x35, 0xf2, 0x6e, 0x72, 0x4b, 0x0d, 0x6f, 0x7c, 0xe7, 0x9e, 0xeb, 0x3f, 0x5d, 0x20, 0x1a, 0x5a, 0xd9, 0x9e, 0x9b, 0x1c}
@@ -74,15 +74,15 @@ func (hash Hash) String() string {
 // Because of that the order of adding and removing elements doesn't matter.
 // Use NewMuHash to initialize a MuHash, or DeserializeMuHash to parse a MuHash.
 type MuHash struct {
-	numerator   *big.Int
-	denominator *big.Int
+	numerator   uint3072
+	denominator uint3072
 }
 
 // SerializedMuHash is a is a byte array representing the storage representation of a MuHash
 type SerializedMuHash [SerializedMuHashSize]byte
 
 // String returns the SerializedMultiSet as the hexadecimal string
-func (serialized *SerializedMuHash) String() string {
+func (serialized SerializedMuHash) String() string {
 	return hex.EncodeToString(serialized[:])
 }
 
@@ -93,77 +93,67 @@ func (mu MuHash) String() string {
 
 // NewMuHash return an empty initialized set.
 // when finalized it should be equal to a finalized set with all elements removed.
-func NewMuHash() MuHash {
-	return MuHash{
-		numerator:   big.NewInt(1),
-		denominator: big.NewInt(1),
+func NewMuHash() *MuHash {
+	return &MuHash{
+		numerator:   one(),
+		denominator: one(),
 	}
 }
 
 // Reset clears the muhash from all data. Equivalent to creating a new empty set
-func (mu MuHash) Reset() {
-	mu.numerator.SetUint64(1)
-	mu.denominator.SetUint64(1)
+func (mu *MuHash) Reset() {
+	mu.numerator.SetToOne()
+	mu.denominator.SetToOne()
 }
 
 // Clone the muhash to create a new one
-func (mu MuHash) Clone() MuHash {
-	return MuHash{
-		numerator:   new(big.Int).Set(mu.numerator),
-		denominator: new(big.Int).Set(mu.denominator),
-	}
+func (mu MuHash) Clone() *MuHash {
+	return &mu
 }
 
 // Add hashes the data and adds it to the muhash.
 // Supports arbitrary length data (subject to the underlying hash function(Blake2b) limits)
-func (mu MuHash) Add(data []byte) {
+func (mu *MuHash) Add(data []byte) {
 	element := dataToElement(data)
 	mu.addElement(element)
 }
 
-func (mu MuHash) addElement(element *big.Int) {
-	mu.numerator.Mul(mu.numerator, element)
-	mu.numerator.Mod(mu.numerator, prime)
+func (mu *MuHash) addElement(element *uint3072) {
+	mu.numerator.Mul(element)
 }
 
 // Remove hashes the data and removes it from the multiset.
 // Supports arbitrary length data (subject to the underlying hash function(Blake2b) limits)
-func (mu MuHash) Remove(data []byte) {
+func (mu *MuHash) Remove(data []byte) {
 	element := dataToElement(data)
 	mu.removeElement(element)
 }
 
-func (mu MuHash) removeElement(element *big.Int) {
-	mu.denominator.Mul(mu.denominator, element)
-	mu.denominator.Mod(mu.denominator, prime)
+func (mu *MuHash) removeElement(element *uint3072) {
+	mu.denominator.Mul(element)
 }
 
 // Combine will add the MuHash together. Equivalent to manually adding all the data elements
 // from one set to the other.
-func (mu MuHash) Combine(other MuHash) {
-	mu.numerator.Mul(mu.numerator, other.numerator)
-	mu.denominator.Mul(mu.denominator, other.denominator)
-	mu.numerator.Mod(mu.numerator, prime)
-	mu.denominator.Mod(mu.denominator, prime)
+func (mu *MuHash) Combine(other *MuHash) {
+	mu.numerator.Mul(&other.numerator)
+	mu.denominator.Mul(&other.denominator)
 }
 
 // Finalize will return a hash(Blake2b) of the multiset.
 // Because the returned value is a hash of a multiset you cannot "Un-Finalize" it.
 // If this is meant for storage then Serialize should be used instead.
-func (mu MuHash) normalize() {
-	// numerator * 1/denominator mod prime
-	mu.denominator.ModInverse(mu.denominator, prime)
-	mu.numerator.Mul(mu.numerator, mu.denominator)
-	mu.numerator.Mod(mu.numerator, prime)
-	mu.denominator.SetUint64(1)
+func (mu *MuHash) normalize() {
+	mu.numerator.Divide(&mu.denominator)
+	mu.denominator.SetToOne()
 }
 
 // Serialize returns a serialized version of the MuHash. This is the only right way to serialize a multiset for storage.
 // This MuHash is not finalized, this is meant for storage.
-func (mu MuHash) Serialize() *SerializedMuHash {
+func (mu *MuHash) Serialize() *SerializedMuHash {
 	mu.normalize()
 	var out SerializedMuHash
-	b := mu.numerator.Bits()
+	b := mu.numerator
 	for i := range b {
 		switch bits.UintSize {
 		case 64:
@@ -179,28 +169,27 @@ func (mu MuHash) Serialize() *SerializedMuHash {
 
 // DeserializeMuHash will deserialize the MuHash that `Serialize()` serialized.
 func DeserializeMuHash(serialized *SerializedMuHash) (*MuHash, error) {
-	b := [384 / wordSizeInBytes]big.Word{}
-	bytesToWordsLE((*[elementByteSize]byte)(serialized), &b)
-	numerator := new(big.Int).SetBits(b[:])
-	if numerator.Cmp(prime) >= 0 {
+	numerator := uint3072{}
+	bytesToWordsLE((*[elementByteSize]byte)(serialized), (*[elementWordSize]uint)(&numerator))
+	if numerator.IsOverflow() {
 		return nil, errOverflow
 	}
 
 	return &MuHash{
 		numerator:   numerator,
-		denominator: new(big.Int).SetUint64(1),
+		denominator: one(),
 	}, nil
 }
 
 // Finalize will return a hash(blake2b) of the multiset.
 // Because the returned value is a hash of a multiset you cannot "Un-Finalize" it.
 // If this is meant for storage then Serialize should be used instead.
-func (mu MuHash) Finalize() *Hash {
+func (mu *MuHash) Finalize() *Hash {
 	ret := Hash(blake2b.Sum256(mu.Serialize()[:]))
 	return &ret
 }
 
-func dataToElement(data []byte) *big.Int {
+func dataToElement(data []byte) *uint3072 {
 	var zeros12 [12]byte
 	hashed := blake2b.Sum256(data)
 	stream, err := chacha20.NewUnauthenticatedCipher(hashed[:], zeros12[:])
@@ -209,18 +198,18 @@ func dataToElement(data []byte) *big.Int {
 	}
 	var elementsBytes [elementByteSize]byte
 	stream.XORKeyStream(elementsBytes[:], elementsBytes[:])
-	var elementsWords [elementWordSize]big.Word
-	bytesToWordsLE(&elementsBytes, &elementsWords)
-	return new(big.Int).SetBits(elementsWords[:])
+	var element uint3072
+	bytesToWordsLE(&elementsBytes, (*[elementWordSize]uint)(&element))
+	return &element
 }
 
-func bytesToWordsLE(elementsBytes *[elementByteSize]byte, elementsWords *[elementWordSize]big.Word) {
+func bytesToWordsLE(elementsBytes *[elementByteSize]byte, elementsWords *[elementWordSize]uint) {
 	for i := range elementsWords {
 		switch bits.UintSize {
 		case 64:
-			elementsWords[i] = big.Word(binary.LittleEndian.Uint64(elementsBytes[i*wordSizeInBytes:]))
+			elementsWords[i] = uint(binary.LittleEndian.Uint64(elementsBytes[i*wordSizeInBytes:]))
 		case 32:
-			elementsWords[i] = big.Word(binary.LittleEndian.Uint32(elementsBytes[i*wordSizeInBytes:]))
+			elementsWords[i] = uint(binary.LittleEndian.Uint32(elementsBytes[i*wordSizeInBytes:]))
 		default:
 			panic("Only 32/64 bits machines are supported")
 		}
