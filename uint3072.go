@@ -1,6 +1,7 @@
 package muhash
 
 import (
+	"math/big"
 	"math/bits"
 )
 
@@ -195,7 +196,18 @@ func (lhs *uint3072) Divide(rhs *uint3072) {
 		rhs.FullReduce()
 	}
 
-	inv := rhs.GetInverse()
+	rightWords := make([]big.Word, limbs)
+	for i := range rightWords {
+		rightWords[i] = big.Word(rhs[i])
+	}
+	var right big.Int
+	right.SetBits(rightWords)
+	right.ModInverse(&right, prime)
+
+	var inv uint3072
+	for i, word := range right.Bits() {
+		inv[i] = uint(word)
+	}
 	lhs.Mul(&inv)
 	if lhs.IsOverflow() {
 		lhs.FullReduce()
