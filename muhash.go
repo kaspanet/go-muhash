@@ -42,14 +42,11 @@ var (
 type Hash [HashSize]byte
 
 // IsEqual returns true if target is the same as hash.
-func (hash *Hash) IsEqual(target *Hash) bool {
-	if hash == nil && target == nil {
-		return true
-	}
-	if hash == nil || target == nil {
+func (hash Hash) IsEqual(target *Hash) bool {
+	if target == nil {
 		return false
 	}
-	return *hash == *target
+	return hash == *target
 }
 
 // SetBytes sets the bytes which represent the hash. An error is returned if
@@ -186,9 +183,8 @@ func DeserializeMuHash(serialized *SerializedMuHash) (*MuHash, error) {
 // Finalize will return a hash(blake2b) of the multiset.
 // Because the returned value is a hash of a multiset you cannot "Un-Finalize" it.
 // If this is meant for storage then Serialize should be used instead.
-func (mu *MuHash) Finalize() *Hash {
-	ret := Hash(blake2b.Sum256(mu.Serialize()[:]))
-	return &ret
+func (mu *MuHash) Finalize() Hash {
+	return blake2b.Sum256(mu.Serialize()[:])
 }
 
 func dataToElement(data []byte, out *uint3072) {

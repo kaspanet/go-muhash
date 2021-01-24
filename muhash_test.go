@@ -90,7 +90,7 @@ func elementFromByte(i byte) []byte {
 func TestRandomMuHashArithmetic(t *testing.T) {
 	r := rand.New(rand.NewSource(1))
 	for i := 0; i < 10; i++ {
-		var res *Hash
+		var res Hash
 		var table [4]byte
 		for i := 0; i < 4; i++ {
 			table[i] = byte(r.Int31n(1 << 3)) // [0, 2^3) can't overflow byte.
@@ -109,7 +109,7 @@ func TestRandomMuHashArithmetic(t *testing.T) {
 			if order == 0 {
 				res = out
 			} else {
-				if !res.IsEqual(out) {
+				if !res.IsEqual(&out) {
 					t.Fatalf("Expected %s == %s", res, out)
 				}
 			}
@@ -169,7 +169,8 @@ func TestMuHash_Serialize(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed deserializing muhash: %v", err)
 	}
-	if !deserialized.Finalize().IsEqual(check.Finalize()) {
+	checkHash := check.Finalize()
+	if !deserialized.Finalize().IsEqual(&checkHash) {
 		t.Fatalf("Expected %s == %s", deserialized.Finalize(), check.Finalize())
 	}
 
@@ -252,7 +253,7 @@ func TestVectorsMuHash_CombineSubtract(t *testing.T) {
 		m2.Remove(test.dataElement)
 	}
 	m1.Combine(m2)
-	if !m1.Finalize().IsEqual(zeroHash) {
+	if !m1.Finalize().IsEqual(&zeroHash) {
 		t.Fatalf("m1 was expected to have a zero hash, but was '%s' instead", m1.Finalize())
 	}
 }
@@ -269,7 +270,7 @@ func TestVectorsMuHash_Commutativity(t *testing.T) {
 	for _, test := range testVectors {
 		m.Add(test.dataElement)
 	}
-	if !m.Finalize().IsEqual(zeroHash) {
+	if !m.Finalize().IsEqual(&zeroHash) {
 		t.Fatalf("m was expected to be zero hash, but was '%s' instead", m.Finalize())
 	}
 
@@ -298,7 +299,8 @@ func TestVectorsMuHash_Commutativity(t *testing.T) {
 	}
 	m2.Remove(removeData)
 
-	if !m1.Finalize().IsEqual(m2.Finalize()) {
+	m2Hash := m2.Finalize()
+	if !m1.Finalize().IsEqual(&m2Hash) {
 		t.Fatalf("m1 and m2 was exepcted to have the same hash, but got instead m1 '%s' and m2 '%s'", m1.Finalize(), m2.Finalize())
 	}
 }
@@ -334,18 +336,18 @@ func TestParseMuHashFail(t *testing.T) {
 func TestMuHash_Reset(t *testing.T) {
 	r := rand.New(rand.NewSource(1))
 	set := NewMuHash()
-	emptySet := NewMuHash()
+	emptySetHash := NewMuHash().Finalize()
 	data := [100]byte{}
 	n, err := r.Read(data[:])
 	if err != nil || n != len(data) {
 		t.Fatalf("failed generating random data '%v' '%d' ", err, n)
 	}
 	set.Add(data[:])
-	if set.Finalize().IsEqual(emptySet.Finalize()) {
+	if set.Finalize().IsEqual(&emptySetHash) {
 		t.Errorf("expected set to be empty. found: '%s'", set.Finalize())
 	}
 	set.Reset()
-	if !set.Finalize().IsEqual(emptySet.Finalize()) {
+	if !set.Finalize().IsEqual(&emptySetHash) {
 		t.Errorf("expected set to be empty. found: '%s'", set.Finalize())
 	}
 }
@@ -356,7 +358,7 @@ func TestMuHashAddRemove(t *testing.T) {
 	r := rand.New(rand.NewSource(1))
 	list := [loopsN][100]byte{}
 	set := NewMuHash()
-	set2 := set.Clone()
+	set2Hash := set.Clone().Finalize()
 	for i := 0; i < loopsN; i++ {
 		data := [100]byte{}
 		n, err := r.Read(data[:])
@@ -366,15 +368,31 @@ func TestMuHashAddRemove(t *testing.T) {
 		set.Add(data[:])
 		list[i] = data
 	}
-	if set.Finalize().IsEqual(set2.Finalize()) {
-		t.Errorf("sets are the same when they should be different: set '%s'\n", set.Finalize())
+	if set.Finalize().IsEqual(&set2Hash) {
+		t.Errorf("sets are the same when they should be different: set '%s', set2: %s\n", set.Finalize(), set2Hash)
 	}
 
 	for i := 0; i < loopsN; i++ {
 		set.Remove(list[i][:])
 	}
-	if !set.Finalize().IsEqual(set2.Finalize()) {
-		t.Errorf("sets are different when they should be the same: set1: '%s', set2: '%s'\n", set.Finalize(), set2.Finalize())
+	if !set.Finalize().IsEqual(&set2Hash) {
+		t.Errorf("sets are different when they should be the same: set1: '%s', set2: '%s'\n", set.Finalize(), set2Hash)
+	}
+}
+
+func TestUint3072_GetInverse(t *testing.T) {
+	r := rand.New(rand.NewSource(0))
+	var element uint3072
+	for i := 0; i < 5; i++ {
+		for i := range element {
+			element[i] = uint(r.Uint64())
+		}
+		inv := element.GetInverse()
+		again := inv.GetInverse()
+
+		if again != element {
+			t.Fatalf("Expected double inverting to be equal, found: %v != %v", again, element)
+		}
 	}
 }
 
