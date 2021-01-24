@@ -114,8 +114,9 @@ func (mu MuHash) Clone() *MuHash {
 // Add hashes the data and adds it to the muhash.
 // Supports arbitrary length data (subject to the underlying hash function(Blake2b) limits)
 func (mu *MuHash) Add(data []byte) {
-	element := dataToElement(data)
-	mu.addElement(element)
+	var element uint3072
+	dataToElement(data, &element)
+	mu.addElement(&element)
 }
 
 func (mu *MuHash) addElement(element *uint3072) {
@@ -125,8 +126,9 @@ func (mu *MuHash) addElement(element *uint3072) {
 // Remove hashes the data and removes it from the multiset.
 // Supports arbitrary length data (subject to the underlying hash function(Blake2b) limits)
 func (mu *MuHash) Remove(data []byte) {
-	element := dataToElement(data)
-	mu.removeElement(element)
+	var element uint3072
+	dataToElement(data, &element)
+	mu.removeElement(&element)
 }
 
 func (mu *MuHash) removeElement(element *uint3072) {
@@ -189,7 +191,7 @@ func (mu *MuHash) Finalize() *Hash {
 	return &ret
 }
 
-func dataToElement(data []byte) *uint3072 {
+func dataToElement(data []byte, out *uint3072) {
 	var zeros12 [12]byte
 	hashed := blake2b.Sum256(data)
 	stream, err := chacha20.NewUnauthenticatedCipher(hashed[:], zeros12[:])
@@ -198,9 +200,7 @@ func dataToElement(data []byte) *uint3072 {
 	}
 	var elementsBytes [elementByteSize]byte
 	stream.XORKeyStream(elementsBytes[:], elementsBytes[:])
-	var element uint3072
-	bytesToWordsLE(&elementsBytes, (*[elementWordSize]uint)(&element))
-	return &element
+	bytesToWordsLE(&elementsBytes, (*[elementWordSize]uint)(out))
 }
 
 func bytesToWordsLE(elementsBytes *[elementByteSize]byte, elementsWords *[elementWordSize]uint) {
