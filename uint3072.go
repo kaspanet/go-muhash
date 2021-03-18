@@ -98,28 +98,63 @@ func (lhs *uint3072) Mul(rhs *uint3072) {
 	// Compute limbs 0..N-2 of lhs*rhs into tmp, including one reduction.
 	for j := 0; j < limbs-1; j++ {
 		var low, high, carry uint
-		mul(&low, &high, lhs[1+j], rhs[limbs+j-(1+j)])
+		high, low = bits.Mul(lhs[1+j], rhs[limbs+j-(1+j)])
 		for i := 2 + j; i < limbs; i++ {
-			muladd3(&low, &high, &carry, lhs[i], rhs[limbs+j-i])
+			tmpHigh, tmpLow := bits.Mul(lhs[i], rhs[limbs+j-i])
+			var tmpCarry uint
+			low, tmpCarry = bits.Add(low, tmpLow, tmpCarry)
+			high, tmpCarry = bits.Add(high, tmpHigh, tmpCarry)
+			carry += tmpCarry
 		}
-		mulnadd3(&carryLow, &carryHigh, &carryHighest, low, high, carry, primeDiff)
+		var tmpCarry, tmpLow uint
+		tmpHigh, tmpLow := bits.Mul(low, primeDiff)
+		carryLow, tmpCarry = bits.Add(carryLow, tmpLow, 0)
+		tmpHigh += tmpCarry
+
+		tmpHigh2, tmpLow2 := bits.Mul(high, primeDiff)
+
+		carryHigh, tmpCarry = bits.Add(tmpLow2, carryHigh, 0)
+		tmpHigh2 += tmpCarry
+		carryHigh, tmpCarry = bits.Add(carryHigh, tmpHigh, 0)
+
+		carryHighest, _ = bits.Add(tmpHigh2, carry*primeDiff, tmpCarry)
 		for i := 0; i < j+1; i++ {
-			muladd3(&carryLow, &carryHigh, &carryHighest, lhs[i], rhs[j-i])
+			var tmpCarry uint
+			tmpHigh, tmpLow := bits.Mul(lhs[i], rhs[j-i])
+			carryLow, tmpCarry = bits.Add(carryLow, tmpLow, tmpCarry)
+			carryHigh, tmpCarry = bits.Add(carryHigh, tmpHigh, tmpCarry)
+			carryHighest += tmpCarry
 		}
-		extract3(&carryLow, &carryHigh, &carryHighest, &tmp[j])
+		tmp[j], carryLow, carryHigh, carryHighest = carryLow, carryHigh, carryHighest, 0
 	}
 
 	// Compute limb N-1 of a*b into tmp.
 	assert(carryHighest == 0)
 	for i := 0; i < limbs; i++ {
-		muladd3(&carryLow, &carryHigh, &carryHighest, lhs[i], rhs[limbs-1-i])
+		var tmpCarry uint
+		tmpHigh, tmpLow := bits.Mul(lhs[i], rhs[limbs-1-i])
+		carryLow, tmpCarry = bits.Add(carryLow, tmpLow, tmpCarry)
+		carryHigh, tmpCarry = bits.Add(carryHigh, tmpHigh, tmpCarry)
+		carryHighest += tmpCarry
 	}
-	extract3(&carryLow, &carryHigh, &carryHighest, &tmp[limbs-1])
+	tmp[limbs-1], carryLow, carryHigh, carryHighest = carryLow, carryHigh, carryHighest, 0
 
 	// Perform a second reduction.
-	muln2(&carryLow, &carryHigh, primeDiff)
+	var tmpLow, tmpHigh uint
+	tmpHigh, carryLow = bits.Mul(carryLow, primeDiff)
+	_, tmpLow = bits.Mul(carryHigh, primeDiff)
+	carryHigh = tmpHigh + tmpLow
 	for j := 0; j < limbs; j++ {
-		addnextract2(&carryLow, &carryHigh, &lhs[j], tmp[j])
+		var tmpCarry uint
+
+		carryLow, tmpCarry = bits.Add(carryLow, tmp[j], tmpCarry)
+		carryHigh, tmpCarry = bits.Add(carryHigh, 0, tmpCarry)
+		carryHigh, tmpCarry = bits.Add(carryHigh, 0, tmpCarry)
+
+		// extract
+		lhs[j] = carryLow
+		carryLow = carryHigh
+		carryHigh = tmpCarry
 	}
 
 	assert(carryHighest == 0)
@@ -273,15 +308,21 @@ func (lhs *uint3072) FullReduce() {
 	low := uint(primeDiff)
 	var high uint
 	for i := 0; i < limbs; i++ {
-		addnextract2(&low, &high, &lhs[i], lhs[i])
+		var carry uint
+
+		low, carry = bits.Add(low, lhs[i], carry)
+		high, carry = bits.Add(high, 0, carry)
+		high, carry = bits.Add(high, 0, carry)
+
+		// extract
+		lhs[i] = low
+		low = high
+		high = carry
 	}
 }
 
 func (lhs *uint3072) SetToOne() {
-	lhs[0] = 1
-	for i := 1; i < limbs; i++ {
-		lhs[i] = 0
-	}
+	*lhs = uint3072{1}
 }
 
 func one() uint3072 {
