@@ -352,7 +352,7 @@ func TestMuHash_Reset(t *testing.T) {
 	}
 }
 
-const loopsN = 150
+const loopsN = 2048
 
 func TestMuHashAddRemove(t *testing.T) {
 	r := rand.New(rand.NewSource(1))
@@ -377,22 +377,6 @@ func TestMuHashAddRemove(t *testing.T) {
 	}
 	if !set.Finalize().IsEqual(&set2Hash) {
 		t.Errorf("sets are different when they should be the same: set1: '%s', set2: '%s'\n", set.Finalize(), set2Hash)
-	}
-}
-
-func TestUint3072_GetInverse(t *testing.T) {
-	r := rand.New(rand.NewSource(0))
-	var element uint3072
-	for i := 0; i < 5; i++ {
-		for i := range element {
-			element[i] = uint(r.Uint64())
-		}
-		inv := element.GetInverse()
-		again := inv.GetInverse()
-
-		if again != element {
-			t.Fatalf("Expected double inverting to be equal, found: %v != %v", again, element)
-		}
 	}
 }
 

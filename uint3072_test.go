@@ -1,6 +1,7 @@
 package muhash
 
 import (
+	"math/rand"
 	"testing"
 )
 
@@ -216,5 +217,43 @@ func Test_muldbladd3(t *testing.T) {
 		if test.carry != test.expectedCarry {
 			t.Fatalf("Test: %d. %#v: %d, found: %d", i, test.expectedCarry, test.expectedCarry, test.carry)
 		}
+	}
+}
+
+func TestUint3072_GetInverse(t *testing.T) {
+	r := rand.New(rand.NewSource(0))
+	var element uint3072
+	for i := 0; i < 5; i++ {
+		for i := range element {
+			element[i] = uint(r.Uint64())
+		}
+		inv := element.GetInverse()
+		again := inv.GetInverse()
+
+		if again != element {
+			t.Fatalf("Expected double inverting to be equal, found: %v != %v", again, element)
+		}
+	}
+}
+
+func TestUint3072MulDiv(t *testing.T) {
+	r := rand.New(rand.NewSource(1))
+	var list [loopsN]uint3072
+	start := one()
+	for i := 0; i < loopsN; i++ {
+		for n := range list[i] {
+			list[i][n] = uint(r.Uint64())
+		}
+		start.Mul(&list[i])
+	}
+	if start == one() {
+		t.Errorf("start is 1 even though it shouldn't be: start '%x', one: %x\n", start, one())
+	}
+
+	for i := 0; i < loopsN; i++ {
+		start.Divide(&list[i])
+	}
+	if start != one() {
+		t.Errorf("start should be 1 but it isn't: start: '%x', one: '%x'\n", start, one())
 	}
 }
