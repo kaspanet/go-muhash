@@ -33,12 +33,8 @@ typedef struct Num3072 {
 
 void Num3072_Multiply(Num3072* this, const Num3072* a);
 void Num3072_Divide(Num3072* this, const Num3072* a);
-void Num3072_SetToOne(Num3072* this);
-void Num3072_Square(Num3072* this);
-int Num3072_IsOverflow(const Num3072* this);
 Num3072 Num3072_GetInverse(const Num3072 *this);
-
-static void Num3072_FullReduce(Num3072* this);
+void Num3072_FullReduce(Num3072* this);
 
 #endif //RUST_MUHASH_MUHASH_H
 

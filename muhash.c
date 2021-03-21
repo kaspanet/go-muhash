@@ -97,15 +97,8 @@ static inline void addnextract2(limb_t *low, limb_t *high, const limb_t *a, limb
     *low = *high;
     *high = carry;
 }
-
-/** in_out = in_out^(2^sq) * mul */
-static inline void square_n_mul(Num3072 *in_out, const int sq, const Num3072 *mul) {
-    for (int j = 0; j < sq; ++j) Num3072_Square(in_out);
-    Num3072_Multiply(in_out, mul);
-}
-
 /** Indicates wether d is larger than the modulus. */
-int Num3072_IsOverflow(const Num3072 *this) {
+static inline int Num3072_IsOverflow(const Num3072 *this) {
     if (this->limbs[0] <= LIMB_MAX - MAX_PRIME_DIFF) return 0;
     for (int i = 1; i < LIMBS; ++i) {
         if (this->limbs[i] != LIMB_MAX) return 0;
@@ -113,49 +106,17 @@ int Num3072_IsOverflow(const Num3072 *this) {
     return 1;
 }
 
-static void Num3072_FullReduce(Num3072 *this) {
+static inline void Num3072_SetToOne(Num3072 *this) {
+    this->limbs[0] = 1;
+    for (int i = 1; i < LIMBS; ++i) this->limbs[i] = 0;
+}
+
+void Num3072_FullReduce(Num3072 *this) {
     limb_t low = MAX_PRIME_DIFF;
     limb_t high = 0;
     for (int i = 0; i < LIMBS; ++i) {
         addnextract2(&low, &high, &this->limbs[i], &this->limbs[i]);
     }
-}
-
-Num3072 Num3072_GetInverse(const Num3072 *this) {
-// For fast exponentiation a sliding window exponentiation with repunit
-// precomputation is utilized. See "Fast Point Decompression for Standard
-// Elliptic Curves" (Brumley, Järvinen, 2008).
-
-    Num3072 p[12]; // p[i] = a^(2^(2^i)-1)
-    Num3072 out;
-
-    p[0] = *this;
-
-    for (int i = 0; i < 11; ++i) {
-        p[i + 1] = p[i];
-        for (int j = 0; j < (1 << i); ++j)
-            Num3072_Square(&p[i + 1]);
-        Num3072_Multiply(&p[i + 1], &p[i]);
-    }
-
-    out = p[11];
-
-    square_n_mul(&out, 512, &p[9]);
-    square_n_mul(&out, 256, &p[8]);
-    square_n_mul(&out, 128, &p[7]);
-    square_n_mul(&out, 64, &p[6]);
-    square_n_mul(&out, 32, &p[5]);
-    square_n_mul(&out, 8, &p[3]);
-    square_n_mul(&out, 2, &p[1]);
-    square_n_mul(&out, 1, &p[0]);
-    square_n_mul(&out, 5, &p[2]);
-    square_n_mul(&out, 3, &p[0]);
-    square_n_mul(&out, 2, &p[0]);
-    square_n_mul(&out, 4, &p[0]);
-    square_n_mul(&out, 4, &p[1]);
-    square_n_mul(&out, 3, &p[0]);
-
-    return out;
 }
 
 void Num3072_Multiply(Num3072 *this, const Num3072 *a) {
@@ -197,72 +158,4 @@ void Num3072_Multiply(Num3072 *this, const Num3072 *a) {
      * */
     if (Num3072_IsOverflow(this)) Num3072_FullReduce(this);
     if (carryLow) Num3072_FullReduce(this);
-}
-
-
-void Num3072_Square(Num3072 *this) {
-    limb_t low = 0, high = 0, carry = 0;
-    Num3072 tmp;
-
-    /* Compute limbs 0..N-2 of this*this into tmp, including one reduction. */
-    for (int j = 0; j < LIMBS - 1; ++j) {
-        limb_t carryLow = 0, carryHigh = 0, carryHighest = 0;
-        for (int i = 0; i < (LIMBS - 1 - j) / 2; ++i)
-            muldbladd3(&carryLow, &carryHigh, &carryHighest, &this->limbs[i + j + 1], &this->limbs[LIMBS - 1 - i]);
-
-        if ((j + 1) & 1)
-            muladd3(&carryLow, &carryHigh, &carryHighest, &this->limbs[(LIMBS - 1 - j) / 2 + j + 1],
-                    &this->limbs[LIMBS - 1 - (LIMBS - 1 - j) / 2]);
-        mulnadd3(&low, &high, &carry, &carryLow, &carryHigh, &carryHighest, MAX_PRIME_DIFF);
-
-        for (int i = 0; i < (j + 1) / 2; ++i)
-            muldbladd3(&low, &high, &carry, &this->limbs[i], &this->limbs[j - i]);
-
-        if ((j + 1) & 1)
-            muladd3(&low, &high, &carry, &this->limbs[(j + 1) / 2], &this->limbs[j - (j + 1) / 2]);
-
-        extract3(&low, &high, &carry, &tmp.limbs[j]);
-    }
-
-    assert(carry == 0);
-    for (int i = 0; i < LIMBS / 2; ++i)
-        muldbladd3(&low, &high, &carry, &this->limbs[i], &this->limbs[LIMBS - 1 - i]);
-    extract3(&low, &high, &carry, &tmp.limbs[LIMBS - 1]);
-
-    /* Perform a second reduction. */
-    muln2(&low, &high, MAX_PRIME_DIFF);
-    for (int j = 0; j < LIMBS; ++j) {
-        addnextract2(&low, &high, &tmp.limbs[j], &this->limbs[j]);
-    }
-
-    assert(high == 0);
-    assert(low == 0 || low == 1);
-
-    /* Perform up to two more reductions if the internal state has already
-     * overflown the MAX of Num3072 or if it is larger than the modulus or
-     * if both are the case.
-     * */
-    if (Num3072_IsOverflow(this)) Num3072_FullReduce(this);
-    if (low) Num3072_FullReduce(this);
-}
-
-void Num3072_SetToOne(Num3072 *this) {
-    this->limbs[0] = 1;
-    for (int i = 1; i < LIMBS; ++i) this->limbs[i] = 0;
-}
-
-void Num3072_Divide(Num3072 *this, const Num3072 *a) {
-    if (Num3072_IsOverflow(this)) Num3072_FullReduce(this);
-
-    Num3072 inv;
-    if (Num3072_IsOverflow(a)) {
-        Num3072 b = *a;
-        Num3072_FullReduce(&b);
-        inv = Num3072_GetInverse(&b);
-    } else {
-        inv = Num3072_GetInverse(a);
-    }
-
-    Num3072_Multiply(this, &inv);
-    if (Num3072_IsOverflow(this)) Num3072_FullReduce(this);
 }
