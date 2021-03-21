@@ -1,0 +1,4 @@
+coverage.out
+fuzz_muhash
+fuzz_muhash.a
+_obj/
