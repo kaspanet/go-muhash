@@ -2,6 +2,8 @@ package muhash
 
 import (
 	"math/rand"
+	"runtime"
+	"sync"
 	"testing"
 )
 
@@ -233,6 +235,76 @@ func TestUint3072_GetInverse(t *testing.T) {
 		if again != element {
 			t.Fatalf("Expected double inverting to be equal, found: %v != %v", again, element)
 		}
+	}
+}
+
+func equalToUint(a *uint3072, b uint) bool {
+	if a[0] != b {
+		return false
+	}
+	for j := 1; j < len(a); j++ {
+		if a[j] != 0 {
+			return false
+		}
+	}
+	return true
+}
+
+func TestUint3072_DivOverflow(t *testing.T) {
+	t.Parallel()
+	var max uint3072
+	for i := range max {
+		max[i] = maxUint
+	}
+	regularOne := one()
+	var wg sync.WaitGroup
+	step := primeDiff / runtime.NumCPU()
+	for c := 0; c < step; c++ {
+		wg.Add(1)
+		go func(c int) {
+			defer wg.Done()
+			start := c * step
+			end := start + step
+			if end > (primeDiff - step) {
+				end = primeDiff
+			}
+			for i := end; i > start; i-- {
+				expected := uint(primeDiff - i)
+				overflown := max
+				overflown[0] = maxUint - uint(i) + 1
+				overflownCopy := overflown
+				overflownCopy.Divide(&regularOne)
+				if !equalToUint(&overflownCopy, expected) {
+					t.Errorf("Expected %v to be %d", overflownCopy, expected)
+					return
+				}
+				// Zero doesn't have a modular inverse
+				if i != primeDiff {
+					lhs := overflown
+					rhs := overflown
+					lhs.Divide(&rhs)
+					if !equalToUint(&lhs, 1) {
+						t.Errorf("Expected %v to be %d", overflownCopy, 1)
+						return
+					}
+				}
+			}
+		}(c)
+	}
+	wg.Wait()
+}
+
+func TestUint3072_MulMax(t *testing.T) {
+	t.Parallel()
+	var max uint3072
+	for i := range max {
+		max[i] = maxUint
+	}
+	max[0] -= primeDiff
+	copyMax := max
+	max.Mul(&copyMax)
+	if !equalToUint(&max, 1) {
+		t.Fatalf("(p-1)*(p-1) mod p should equal 1, instead got: %v", max)
 	}
 }
 
