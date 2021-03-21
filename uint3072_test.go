@@ -254,7 +254,7 @@ func TestUint3072_GetInverse(t *testing.T) {
 	}
 }
 
-func equalToUint(a *uint3072, b uint) bool {
+func uint3072equalToUint(a *uint3072, b uint) bool {
 	if a[0] != b {
 		return false
 	}
@@ -267,7 +267,7 @@ func equalToUint(a *uint3072, b uint) bool {
 }
 
 func TestUint3072_DivOverflow(t *testing.T) {
-	t.Parallel()
+	tests := make([]byte, primeDiff)
 	var max uint3072
 	for i := range max {
 		max[i] = maxUint
@@ -275,7 +275,7 @@ func TestUint3072_DivOverflow(t *testing.T) {
 	regularOne := one()
 	var wg sync.WaitGroup
 	step := primeDiff / runtime.NumCPU()
-	for c := 0; c < step; c++ {
+	for c := 0; c < runtime.NumCPU(); c++ {
 		wg.Add(1)
 		go func(c int) {
 			defer wg.Done()
@@ -290,7 +290,8 @@ func TestUint3072_DivOverflow(t *testing.T) {
 				overflown[0] = maxUint - uint(i) + 1
 				overflownCopy := overflown
 				overflownCopy.Divide(&regularOne)
-				if !equalToUint(&overflownCopy, expected) {
+				tests[expected]++
+				if !uint3072equalToUint(&overflownCopy, expected) {
 					t.Errorf("Expected %v to be %d", overflownCopy, expected)
 					return
 				}
@@ -299,7 +300,7 @@ func TestUint3072_DivOverflow(t *testing.T) {
 					lhs := overflown
 					rhs := overflown
 					lhs.Divide(&rhs)
-					if !equalToUint(&lhs, 1) {
+					if !uint3072equalToUint(&lhs, 1) {
 						t.Errorf("Expected %v to be %d", overflownCopy, 1)
 						return
 					}
@@ -308,6 +309,11 @@ func TestUint3072_DivOverflow(t *testing.T) {
 		}(c)
 	}
 	wg.Wait()
+	for i, n := range tests {
+		if n != 1 {
+			t.Fatalf("Expected all the integers 0..%d to be checked once, but %d was checked %d times", primeDiff, i, n)
+		}
+	}
 }
 
 func TestUint3072_MulMax(t *testing.T) {
@@ -319,7 +325,7 @@ func TestUint3072_MulMax(t *testing.T) {
 	max[0] -= primeDiff
 	copyMax := max
 	max.Mul(&copyMax)
-	if !equalToUint(&max, 1) {
+	if !uint3072equalToUint(&max, 1) {
 		t.Fatalf("(p-1)*(p-1) mod p should equal 1, instead got: %v", max)
 	}
 }
