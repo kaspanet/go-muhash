@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -70,9 +71,9 @@ func TestMain(m *testing.M) {
 		}
 		testVectors = append(testVectors, res)
 	}
-	var max uint3072
-	for i := range max {
-		max[i] = maxUint
+	var max num3072
+	for i := range max.limbs {
+		max.limbs[i] = ^word(0)
 	}
 	maxMuHash = MuHash{
 		numerator:   max,
@@ -193,7 +194,7 @@ func TestMuHash_Serialize(t *testing.T) {
 
 	serializedZeros := SerializedMuHash{}
 	zeroed := NewMuHash()
-	zeroed.addElement(&uint3072{}) // multiply by zero.
+	zeroed.addElement(&num3072{}) // multiply by zero.
 	serialized = zeroed.Serialize()
 	if !bytes.Equal(serialized[:], serializedZeros[:]) {
 		t.Fatalf("expected serialized to be all zeros, instead found: %s", serialized)
@@ -390,6 +391,65 @@ func TestMuHashAddRemove(t *testing.T) {
 	}
 }
 
+func TestHash_IsEqual(t *testing.T) {
+	t.Parallel()
+	r := rand.New(rand.NewSource(1))
+	goodHash := &Hash{}
+	n, err := r.Read(goodHash[:])
+	if err != nil || n != len(goodHash) {
+		t.Errorf("Failed generating a random hash. read: '%d' bytes.. '%s'", n, err)
+	}
+	emptyHash := Hash{}
+	if emptyHash.IsEqual(goodHash) {
+		t.Errorf("Empty hash shouldn't be equal to filled one")
+	}
+	if !emptyHash.IsEqual(&Hash{}) {
+		t.Errorf("Empty hash should be equal to another empty hash")
+	}
+	if goodHash.IsEqual(nil) {
+		t.Errorf("nil hash shouldn't be equal to good one")
+	}
+
+	copyGoodHash := *goodHash
+	if !copyGoodHash.IsEqual(goodHash) {
+		t.Errorf("A hash and its copy should be the same")
+	}
+	goodHash2 := &Hash{}
+	n, err = r.Read(goodHash2[:])
+	if err != nil || n != len(goodHash2) {
+		t.Errorf("Failed generating a random hash. read: '%d' bytes. .'%s'", n, err)
+	}
+	if goodHash.IsEqual(goodHash2) {
+		t.Errorf("'%s' shouldn't be equal to %s", goodHash, goodHash2)
+	}
+}
+
+func TestHash_SetBytes(t *testing.T) {
+	t.Parallel()
+	r := rand.New(rand.NewSource(1))
+	hash := &Hash{}
+	n, err := r.Read(hash[:])
+	if err != nil || n != len(hash) {
+		t.Errorf("Failed generating a random hash. read: '%d' bytes.. '%s'", n, err)
+	}
+	copyHash := *hash
+	err = hash.SetBytes(hash[:])
+	if err != nil {
+		t.Errorf("Setting a hash by its own bytes should work: %s", err)
+	}
+	if !hash.IsEqual(&copyHash) {
+		t.Errorf("Setting a hash to its own bytes should stay the same")
+	}
+
+	err = hash.SetBytes(hash[:HashSize-1])
+	if err == nil {
+		t.Errorf("Hash.SetBytes should fail on smaller byte slices")
+	}
+	if !strings.Contains(err.Error(), "invalid") || !strings.Contains(err.Error(), "length") {
+		t.Errorf("Expected the error message to contain the words 'invalid' and 'length', instead found: %s", err)
+	}
+}
+
 func BenchmarkMuHash_Add(b *testing.B) {
 	set := NewMuHash()
 	var data [100]byte
@@ -439,9 +499,9 @@ func BenchmarkMuHash_CombineRand(b *testing.B) {
 	r := rand.New(rand.NewSource(0))
 	set := NewMuHash()
 	var element MuHash
-	for i := range element.numerator {
-		element.numerator[i] = uint(r.Uint64())
-		element.denominator[i] = uint(r.Uint64())
+	for i := range element.numerator.limbs {
+		element.numerator.limbs[i] = word(r.Uint64())
+		element.denominator.limbs[i] = word(r.Uint64())
 	}
 	element.normalize()
 	b.ReportAllocs()
@@ -477,9 +537,9 @@ func BenchmarkMuHash_normalizeBest(b *testing.B) {
 func BenchmarkMuHash_normalizeRand(b *testing.B) {
 	r := rand.New(rand.NewSource(0))
 	var set MuHash
-	for i := range set.numerator {
-		set.numerator[i] = uint(r.Uint64())
-		set.denominator[i] = uint(r.Uint64())
+	for i := range set.numerator.limbs {
+		set.numerator.limbs[i] = word(r.Uint64())
+		set.denominator.limbs[i] = word(r.Uint64())
 	}
 	set.normalize()
 
