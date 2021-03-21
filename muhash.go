@@ -10,7 +10,6 @@ import (
 	"golang.org/x/crypto/blake2b"
 	"golang.org/x/crypto/chacha20"
 	"math/big"
-	"math/bits"
 )
 
 const (
@@ -21,8 +20,6 @@ const (
 
 	elementBitSize  = 3072
 	elementByteSize = elementBitSize / 8
-	elementWordSize = 3072 / bits.UintSize
-	wordSizeInBytes = bits.UintSize / 8
 
 	primeDiff = 1103717
 )
@@ -71,8 +68,8 @@ func (hash Hash) String() string {
 // Because of that the order of adding and removing elements doesn't matter.
 // Use NewMuHash to initialize a MuHash, or DeserializeMuHash to parse a MuHash.
 type MuHash struct {
-	numerator   uint3072
-	denominator uint3072
+	numerator   num3072
+	denominator num3072
 }
 
 // SerializedMuHash is a is a byte array representing the storage representation of a MuHash
@@ -92,8 +89,8 @@ func (mu MuHash) String() string {
 // when finalized it should be equal to a finalized set with all elements removed.
 func NewMuHash() *MuHash {
 	return &MuHash{
-		numerator:   one(),
-		denominator: one(),
+		numerator:   oneNum3072(),
+		denominator: oneNum3072(),
 	}
 }
 
@@ -111,24 +108,24 @@ func (mu MuHash) Clone() *MuHash {
 // Add hashes the data and adds it to the muhash.
 // Supports arbitrary length data (subject to the underlying hash function(Blake2b) limits)
 func (mu *MuHash) Add(data []byte) {
-	var element uint3072
+	var element num3072
 	dataToElement(data, &element)
 	mu.addElement(&element)
 }
 
-func (mu *MuHash) addElement(element *uint3072) {
+func (mu *MuHash) addElement(element *num3072) {
 	mu.numerator.Mul(element)
 }
 
 // Remove hashes the data and removes it from the multiset.
 // Supports arbitrary length data (subject to the underlying hash function(Blake2b) limits)
 func (mu *MuHash) Remove(data []byte) {
-	var element uint3072
+	var element num3072
 	dataToElement(data, &element)
 	mu.removeElement(&element)
 }
 
-func (mu *MuHash) removeElement(element *uint3072) {
+func (mu *MuHash) removeElement(element *num3072) {
 	mu.denominator.Mul(element)
 }
 
@@ -153,12 +150,12 @@ func (mu *MuHash) Serialize() *SerializedMuHash {
 	mu.normalize()
 	var out SerializedMuHash
 	b := mu.numerator
-	for i := range b {
-		switch bits.UintSize {
+	for i := range b.limbs {
+		switch wordSize {
 		case 64:
-			binary.LittleEndian.PutUint64(out[i*wordSizeInBytes:], uint64(b[i]))
+			binary.LittleEndian.PutUint64(out[i*wordSizeInBytes:], uint64(b.limbs[i]))
 		case 32:
-			binary.LittleEndian.PutUint32(out[i*wordSizeInBytes:], uint32(b[i]))
+			binary.LittleEndian.PutUint32(out[i*wordSizeInBytes:], uint32(b.limbs[i]))
 		default:
 			panic("Only 32/64 bits machines are supported")
 		}
@@ -168,15 +165,15 @@ func (mu *MuHash) Serialize() *SerializedMuHash {
 
 // DeserializeMuHash will deserialize the MuHash that `Serialize()` serialized.
 func DeserializeMuHash(serialized *SerializedMuHash) (*MuHash, error) {
-	numerator := uint3072{}
-	bytesToWordsLE((*[elementByteSize]byte)(serialized), (*[elementWordSize]uint)(&numerator))
+	numerator := num3072{}
+	bytesToWordsLE((*[elementByteSize]byte)(serialized), &numerator.limbs)
 	if numerator.IsOverflow() {
 		return nil, errOverflow
 	}
 
 	return &MuHash{
 		numerator:   numerator,
-		denominator: one(),
+		denominator: oneNum3072(),
 	}, nil
 }
 
@@ -187,7 +184,7 @@ func (mu *MuHash) Finalize() Hash {
 	return blake2b.Sum256(mu.Serialize()[:])
 }
 
-func dataToElement(data []byte, out *uint3072) {
+func dataToElement(data []byte, out *num3072) {
 	var zeros12 [12]byte
 	hashed := blake2b.Sum256(data)
 	stream, err := chacha20.NewUnauthenticatedCipher(hashed[:], zeros12[:])
@@ -196,16 +193,16 @@ func dataToElement(data []byte, out *uint3072) {
 	}
 	var elementsBytes [elementByteSize]byte
 	stream.XORKeyStream(elementsBytes[:], elementsBytes[:])
-	bytesToWordsLE(&elementsBytes, (*[elementWordSize]uint)(out))
+	bytesToWordsLE(&elementsBytes, &out.limbs)
 }
 
-func bytesToWordsLE(elementsBytes *[elementByteSize]byte, elementsWords *[elementWordSize]uint) {
+func bytesToWordsLE(elementsBytes *[elementByteSize]byte, elementsWords *[elementWordSize]word) {
 	for i := range elementsWords {
-		switch bits.UintSize {
+		switch wordSize {
 		case 64:
-			elementsWords[i] = uint(binary.LittleEndian.Uint64(elementsBytes[i*wordSizeInBytes:]))
+			elementsWords[i] = word(binary.LittleEndian.Uint64(elementsBytes[i*wordSizeInBytes:]))
 		case 32:
-			elementsWords[i] = uint(binary.LittleEndian.Uint32(elementsBytes[i*wordSizeInBytes:]))
+			elementsWords[i] = word(binary.LittleEndian.Uint32(elementsBytes[i*wordSizeInBytes:]))
 		default:
 			panic("Only 32/64 bits machines are supported")
 		}
