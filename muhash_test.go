@@ -88,6 +88,7 @@ func elementFromByte(i byte) []byte {
 }
 
 func TestRandomMuHashArithmetic(t *testing.T) {
+	t.Parallel()
 	r := rand.New(rand.NewSource(1))
 	for i := 0; i < 10; i++ {
 		var res Hash
@@ -134,6 +135,7 @@ func TestRandomMuHashArithmetic(t *testing.T) {
 }
 
 func TestNewPreComputed(t *testing.T) {
+	t.Parallel()
 	expected := "afd9eb8885b98062d6720cfb034886bc332b10251adc037d2a5fc4c17c11832f"
 	acc := NewMuHash()
 	acc.Add(elementFromByte(0))
@@ -153,6 +155,7 @@ func TestNewPreComputed(t *testing.T) {
 }
 
 func TestMuHash_Serialize(t *testing.T) {
+	t.Parallel()
 	expected, err := hex.DecodeString("ad8b80dae66ba6c0c63c02079cdac340f26ca6614584431de4c46a46e521bc5c0e5bb7e475e2df1c501c34dfd9534731a6e631c9d4fce641da66b08a26f8ebb738e0bc8bb5ae07f9fc58bdcf790444df315a8eadc3edc8e27325623fce2e25c6d03a785eb482c9887af6b72bd757e977c958e25ea33b631c77e52713b5c66e8f8d7bdc04f50ce4cc68eca4dde3a1621de22c1634de13fdae65b43ee1caeefa71804276b84a159669e0522fde03364311bd57607e01b68b8e55d68b84c1c8e038248de9af3c7aeb16a9261edbe6ece62a14a4d770fbf006d179a9c5ca8226a5dae7e2cb81a31c3db35aa18d3a3eac994c7e9fc61ea0ebb32b49dd2a6c7e1eca086a39b9ee29fffe587e46a6d25a1df5dd285b43daf3176432a58725940067f69eb6fe8b3f80e137a2642fb8f66395cd3865a3259a4499351191335ca53d04153179717125a500c87e95493a25547bf1e96ea18d174bd857debdb10d2f33d1ce220da7ffb1e56ef5be8d6a855b5b8cea70b3dd32cf9bc533fca33d71560ac6e182")
 	if err != nil {
 		t.Fatalf("Failed deserializing hex string: %v", err)
@@ -207,6 +210,7 @@ func TestMuHash_Serialize(t *testing.T) {
 }
 
 func TestVectorsMuHash_Hash(t *testing.T) {
+	t.Parallel()
 	for _, test := range testVectors {
 		m := NewMuHash()
 		m.Add(test.dataElement)
@@ -222,6 +226,7 @@ func TestVectorsMuHash_Hash(t *testing.T) {
 }
 
 func TestVectorsMuHash_AddRemove(t *testing.T) {
+	t.Parallel()
 	m := NewMuHash()
 	for i, test := range testVectors {
 		m.Add(test.dataElement)
@@ -241,6 +246,7 @@ func TestVectorsMuHash_AddRemove(t *testing.T) {
 }
 
 func TestVectorsMuHash_CombineSubtract(t *testing.T) {
+	t.Parallel()
 	m1 := NewMuHash()
 	zeroHash := m1.Finalize()
 
@@ -259,6 +265,7 @@ func TestVectorsMuHash_CombineSubtract(t *testing.T) {
 }
 
 func TestVectorsMuHash_Commutativity(t *testing.T) {
+	t.Parallel()
 	m := NewMuHash()
 	zeroHash := m.Finalize()
 
@@ -306,6 +313,7 @@ func TestVectorsMuHash_Commutativity(t *testing.T) {
 }
 
 func TestParseMuHashFail(t *testing.T) {
+	t.Parallel()
 	r := rand.New(rand.NewSource(1))
 	data := SerializedMuHash{}
 	copy(data[:], prime.Bytes())
@@ -334,6 +342,7 @@ func TestParseMuHashFail(t *testing.T) {
 }
 
 func TestMuHash_Reset(t *testing.T) {
+	t.Parallel()
 	r := rand.New(rand.NewSource(1))
 	set := NewMuHash()
 	emptySetHash := NewMuHash().Finalize()
@@ -352,9 +361,10 @@ func TestMuHash_Reset(t *testing.T) {
 	}
 }
 
-const loopsN = 2048
+const loopsN = 1024
 
 func TestMuHashAddRemove(t *testing.T) {
+	t.Parallel()
 	r := rand.New(rand.NewSource(1))
 	list := [loopsN][100]byte{}
 	set := NewMuHash()

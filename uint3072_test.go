@@ -8,6 +8,7 @@ import (
 )
 
 func Test_mul(t *testing.T) {
+	t.Parallel()
 	type Test struct {
 		a            uint
 		b            uint
@@ -41,6 +42,7 @@ func Test_mul(t *testing.T) {
 }
 
 func Test_mulnadd3(t *testing.T) {
+	t.Parallel()
 	type Test struct {
 		c0         uint
 		c1         uint
@@ -94,6 +96,7 @@ func Test_mulnadd3(t *testing.T) {
 }
 
 func Test_muln2(t *testing.T) {
+	t.Parallel()
 	type Test struct {
 		low          uint
 		high         uint
@@ -129,6 +132,7 @@ func Test_muln2(t *testing.T) {
 }
 
 func Test_muladd3(t *testing.T) {
+	t.Parallel()
 	type Test struct {
 		low           uint
 		high          uint
@@ -176,6 +180,7 @@ func Test_muladd3(t *testing.T) {
 }
 
 func Test_muldbladd3(t *testing.T) {
+	t.Parallel()
 	type Test struct {
 		low           uint
 		high          uint
@@ -207,6 +212,16 @@ func Test_muldbladd3(t *testing.T) {
 			expectedHigh:  18446744073677119184,
 			expectedCarry: 18446209541278119192,
 		},
+		{
+			low:           0,
+			high:          0,
+			carry:         0,
+			a:             1,
+			b:             1,
+			expectedLow:   2,
+			expectedHigh:  0,
+			expectedCarry: 0,
+		},
 	}
 	for i, test := range tests {
 		muldbladd3(&test.low, &test.high, &test.carry, test.a, test.b)
@@ -223,6 +238,7 @@ func Test_muldbladd3(t *testing.T) {
 }
 
 func TestUint3072_GetInverse(t *testing.T) {
+	t.Parallel()
 	r := rand.New(rand.NewSource(0))
 	var element uint3072
 	for i := 0; i < 5; i++ {
@@ -309,6 +325,7 @@ func TestUint3072_MulMax(t *testing.T) {
 }
 
 func TestUint3072MulDiv(t *testing.T) {
+	t.Parallel()
 	r := rand.New(rand.NewSource(1))
 	var list [loopsN]uint3072
 	start := one()
