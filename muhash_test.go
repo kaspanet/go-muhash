@@ -26,18 +26,18 @@ var testVectorsStrings = []struct {
 }{
 	{
 		"982051fd1e4ba744bbbe680e1fee14677ba1a3c3540bf7b1cdb606e857233e0e00000000010000000100f2052a0100000043410496b538e853519c726a2c91e61ec11600ae1390813a627c66fb8be7947be63c52da7589379515d4e0a604f8141781e62294721166bf621e73a82cbf2342c858eeac",
-		"8aba1bb6ea174fba90d4a626463859646ff02c854fb99f2619c9200fa70c2e93",
-		"8aba1bb6ea174fba90d4a626463859646ff02c854fb99f2619c9200fa70c2e93",
+		"2c379620fdf4ec0ac253cbe4ba82c2bbdc0fedac7fe0e452957d93757bbff5c1",
+		"2c379620fdf4ec0ac253cbe4ba82c2bbdc0fedac7fe0e452957d93757bbff5c1",
 	},
 	{
 		"d5fdcc541e25de1c7a5addedf24858b8bb665c9f36ef744ee42c316022c90f9b00000000020000000100f2052a010000004341047211a824f55b505228e4c3d5194c1fcfaa15a456abdf37f9b9d97a4040afc073dee6c89064984f03385237d92167c13e236446b417ab79a0fcae412ae3316b77ac",
-		"95fb628ed07fd2187fda0184f3966312ba98baf3ac83639b8c6dd7cc7a09d8b4",
-		"b85145198ec445421a85748101ec2bc019daa5ecda8eda2380181d6c8ebf3463",
+		"668bb292ef152c54db0f5714bf45ff8da7b1d41c0c5026ad655b2f9e1be67e21",
+		"b15bd1124a6b52e64eda3c3023c587e455a79e748c8c954dd7411d0dbd973863",
 	},
 	{
 		"44f672226090d85db9a9f2fbfe5f0f9609b387af7be5b7fbb7a1767c831c9e9900000000030000000100f2052a0100000043410494b9d3e76c5b1629ecf97fff95d7a4bbdac87cc26099ada28066c6ff1eb9191223cd897194a08d0c2726c5747f1db49e8cf90e75dc3e3550ae9b30086f3cd5aaac",
-		"78f145af890dbbb59a4d86b6376e282c16af61c7cdf33d495357df4be9c35013",
-		"e8cf5b87a35612fda22dcc06ce3d512a44c4e46c118594adc71190515b418a52",
+		"f40b20bdc43ef2f01a173b767cb9c6b8db5602eb535fcb9827385f9b0e3afaf4",
+		"e69c6e050410761648ce6276a81c8044b9efb1715ea6f6fb9f8cf7a8c1e80396",
 	},
 }
 
@@ -137,7 +137,7 @@ func TestRandomMuHashArithmetic(t *testing.T) {
 
 func TestNewPreComputed(t *testing.T) {
 	t.Parallel()
-	expected := "afd9eb8885b98062d6720cfb034886bc332b10251adc037d2a5fc4c17c11832f"
+	expected := "b557f7cfc13cf9abc31374832715e7bff2cf5859897523337a0ead9dde012974"
 	acc := NewMuHash()
 	acc.Add(elementFromByte(0))
 	acc.Add(elementFromByte(1))
@@ -157,7 +157,7 @@ func TestNewPreComputed(t *testing.T) {
 
 func TestMuHash_Serialize(t *testing.T) {
 	t.Parallel()
-	expected, err := hex.DecodeString("ad8b80dae66ba6c0c63c02079cdac340f26ca6614584431de4c46a46e521bc5c0e5bb7e475e2df1c501c34dfd9534731a6e631c9d4fce641da66b08a26f8ebb738e0bc8bb5ae07f9fc58bdcf790444df315a8eadc3edc8e27325623fce2e25c6d03a785eb482c9887af6b72bd757e977c958e25ea33b631c77e52713b5c66e8f8d7bdc04f50ce4cc68eca4dde3a1621de22c1634de13fdae65b43ee1caeefa71804276b84a159669e0522fde03364311bd57607e01b68b8e55d68b84c1c8e038248de9af3c7aeb16a9261edbe6ece62a14a4d770fbf006d179a9c5ca8226a5dae7e2cb81a31c3db35aa18d3a3eac994c7e9fc61ea0ebb32b49dd2a6c7e1eca086a39b9ee29fffe587e46a6d25a1df5dd285b43daf3176432a58725940067f69eb6fe8b3f80e137a2642fb8f66395cd3865a3259a4499351191335ca53d04153179717125a500c87e95493a25547bf1e96ea18d174bd857debdb10d2f33d1ce220da7ffb1e56ef5be8d6a855b5b8cea70b3dd32cf9bc533fca33d71560ac6e182")
+	expected, err := hex.DecodeString("320549a6c6d21fca2540dbde399e795943bcd349d9fbfab287c427fa7aca38e492e9f9104409ff9e9854a8927951b53c608d721a7f8ca45a57bb1804bb97875b09f9677c5b3748ca2bf1c4f3c9ed8d9ea67db91ac9e850480307f89874942cfa6ca7af3d809f30941cf7169e2882299a5db8c7b100aad49f3de983f31011f684721f9b2519616b0b6411173d0cdab081ad94dd06989d706a5a05d700858529f1d9ed06ca6afcc4f4d18ddcec28dddb7ade601bbd3c45967c1d4ecef992b3bf0bbbb230727f9b4a898c6db658c078478dc55db2b3fefca7fbf54d70bad81eef93a84359600e66a5bba3e8334d7586a0fe59c939714c896365e9232ed57c26f70c7dcbdc367244f2c06bd8e28c424e41a6ff040259f7b8cc913669d2d1c3f83fcfc7dafd5c96bed4d81779120e1b23bfcb32ee0abec02fd2643a26c967c73b204825dd685778de3d906b6b721b9858e87161b84574113bf597638ca7552f1c33c68ce9155cd34f0144d9832513056b33db8d6d9bc4b7941071e38dcad7bf32f1f4")
 	if err != nil {
 		t.Fatalf("Failed deserializing hex string: %v", err)
 	}
@@ -217,7 +217,7 @@ func TestVectorsMuHash_Hash(t *testing.T) {
 		m.Add(test.dataElement)
 		mFinal := m.Finalize()
 		if !m.Finalize().IsEqual(&test.multisetHash) {
-			t.Fatalf("MuHash-Hash returned incorrect hash serialization, expected: '%s', found: '%s'", test.multisetHash, mFinal)
+			t.Errorf("MuHash-Hash returned incorrect hash serialization, expected: '%s', found: '%s'", test.multisetHash, mFinal)
 		}
 	}
 	m := NewMuHash()
@@ -233,7 +233,7 @@ func TestVectorsMuHash_AddRemove(t *testing.T) {
 		m.Add(test.dataElement)
 		mFinal := m.Finalize()
 		if !mFinal.IsEqual(&test.cumulativeHash) {
-			t.Fatalf("Test #%d: MuHash-Add returned incorrect hash. Expected '%s' but got '%s'", i, test.cumulativeHash, mFinal)
+			t.Errorf("Test #%d: MuHash-Add returned incorrect hash. Expected '%s' but got '%s'", i, test.cumulativeHash, mFinal)
 		}
 	}
 
@@ -241,7 +241,7 @@ func TestVectorsMuHash_AddRemove(t *testing.T) {
 		m.Remove(testVectors[i].dataElement)
 		mFinal := m.Finalize()
 		if !mFinal.IsEqual(&testVectors[i-1].cumulativeHash) {
-			t.Fatalf("Test #%d: MuHash-Remove returned incorrect hash. Expected '%s' but got '%s'", i, testVectors[i].cumulativeHash, mFinal)
+			t.Errorf("Test #%d: MuHash-Remove returned incorrect hash. Expected '%s' but got '%s'", i, testVectors[i].cumulativeHash, mFinal)
 		}
 	}
 }
