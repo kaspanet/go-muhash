@@ -147,8 +147,13 @@ func (mu *MuHash) normalize() {
 // Serialize returns a serialized version of the MuHash. This is the only right way to serialize a multiset for storage.
 // This MuHash is not finalized, this is meant for storage.
 func (mu *MuHash) Serialize() *SerializedMuHash {
-	mu.normalize()
 	var out SerializedMuHash
+	mu.serializeInner(&out)
+	return &out
+}
+
+func (mu *MuHash) serializeInner(out *SerializedMuHash) {
+	mu.normalize()
 	b := mu.numerator
 	for i := range b.limbs {
 		switch wordSize {
@@ -160,7 +165,6 @@ func (mu *MuHash) Serialize() *SerializedMuHash {
 			panic("Only 32/64 bits machines are supported")
 		}
 	}
-	return &out
 }
 
 // DeserializeMuHash will deserialize the MuHash that `Serialize()` serialized.
@@ -181,7 +185,9 @@ func DeserializeMuHash(serialized *SerializedMuHash) (*MuHash, error) {
 // Because the returned value is a hash of a multiset you cannot "Un-Finalize" it.
 // If this is meant for storage then Serialize should be used instead.
 func (mu *MuHash) Finalize() Hash {
-	return blake2b.Sum256(mu.Serialize()[:])
+	var serialized SerializedMuHash
+	mu.serializeInner(&serialized)
+	return blake2b.Sum256(serialized[:])
 }
 
 func dataToElement(data []byte, out *num3072) {

@@ -52,7 +52,7 @@ func (lhs *num3072) Divide(rhs *num3072) {
 		lhs.FullReduce()
 	}
 	inv := rhs.GetInverse()
-	lhs.Mul(&inv)
+	lhs.Mul(inv)
 	if lhs.IsOverflow() {
 		lhs.FullReduce()
 	}
@@ -74,7 +74,7 @@ func (lhs *num3072) FullReduce() {
 	C.Num3072_FullReduce((*C.Num3072)(lhs))
 }
 
-func (lhs *num3072) GetInverse() num3072 {
+func (lhs *num3072) GetInverse() *num3072 {
 	if lhs.IsOverflow() {
 		lhs.FullReduce()
 	}
@@ -86,5 +86,5 @@ func (lhs *num3072) GetInverse() num3072 {
 	for i := len(bigInt.Bits()); i < len(inv.limbs); i++ {
 		inv.limbs[i] = 0
 	}
-	return inv
+	return &inv
 }
