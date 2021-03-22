@@ -57,6 +57,11 @@ func (hash *Hash) SetBytes(newHash []byte) error {
 	return nil
 }
 
+// AsArray is a helper function to returns a pointer to the underlying byte array.
+func (hash *Hash) AsArray() *[32]byte {
+	return (*[32]byte)(hash)
+}
+
 // String returns the Hash as the hexadecimal string
 func (hash Hash) String() string {
 	return hex.EncodeToString(hash[:])
