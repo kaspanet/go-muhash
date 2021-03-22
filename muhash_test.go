@@ -503,7 +503,6 @@ func BenchmarkMuHash_CombineRand(b *testing.B) {
 		element.numerator.limbs[i] = word(r.Uint64())
 		element.denominator.limbs[i] = word(r.Uint64())
 	}
-	element.normalize()
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -520,8 +519,10 @@ func BenchmarkMuHash_Clone(b *testing.B) {
 
 func BenchmarkMuHash_normalizeWorst(b *testing.B) {
 	b.ReportAllocs()
+	set := maxMuHash
+	set.denominator.limbs[0]--
 	for i := 0; i < b.N; i++ {
-		maxMuHash.Clone().normalize()
+		set.Clone().normalize()
 	}
 }
 
@@ -541,7 +542,6 @@ func BenchmarkMuHash_normalizeRand(b *testing.B) {
 		set.numerator.limbs[i] = word(r.Uint64())
 		set.denominator.limbs[i] = word(r.Uint64())
 	}
-	set.normalize()
 
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -551,8 +551,15 @@ func BenchmarkMuHash_normalizeRand(b *testing.B) {
 }
 
 func BenchmarkMuHash_Finalize(b *testing.B) {
+	r := rand.New(rand.NewSource(0))
+	var set MuHash
+	for i := range set.numerator.limbs {
+		set.numerator.limbs[i] = word(r.Uint64())
+		set.denominator.limbs[i] = word(r.Uint64())
+	}
+	b.ResetTimer()
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		maxMuHash.Clone().Finalize()
+		set.Clone().Finalize()
 	}
 }
