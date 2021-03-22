@@ -29,7 +29,7 @@ var (
 	prime = new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), 3072), big.NewInt(primeDiff))
 
 	// EmptyMuHashHash is the hash of `NewMuHash().Finalize()`
-	EmptyMuHashHash = Hash{0x32, 0x9d, 0x0a, 0x9d, 0x0c, 0xe1, 0x81, 0x7a, 0xa8, 0x82, 0xf8, 0x09, 0x35, 0xf2, 0x6e, 0x72, 0x4b, 0x0d, 0x6f, 0x7c, 0xe7, 0x9e, 0xeb, 0x3f, 0x5d, 0x20, 0x1a, 0x5a, 0xd9, 0x9e, 0x9b, 0x1c}
+	EmptyMuHashHash = Hash{0x54, 0x4e, 0xb3, 0x14, 0x2c, 0x0, 0xf, 0xa, 0xd2, 0xc7, 0x6a, 0xc4, 0x1f, 0x42, 0x22, 0xab, 0xba, 0xba, 0xbe, 0xd8, 0x30, 0xee, 0xaf, 0xee, 0x4b, 0x6d, 0xc5, 0x6b, 0x52, 0xd5, 0xca, 0xc0}
 
 	errOverflow = errors.New("Overflow in the MuHash field")
 )
@@ -185,14 +185,27 @@ func DeserializeMuHash(serialized *SerializedMuHash) (*MuHash, error) {
 // Because the returned value is a hash of a multiset you cannot "Un-Finalize" it.
 // If this is meant for storage then Serialize should be used instead.
 func (mu *MuHash) Finalize() Hash {
+	blake, err := blake2b.New256([]byte("MuHashFinalize"))
+	if err != nil {
+		panic(errors.Wrap(err, "this should never happen. MuHashFinalize is less than 64 bytes"))
+	}
 	var serialized SerializedMuHash
 	mu.serializeInner(&serialized)
-	return blake2b.Sum256(serialized[:])
+	var res Hash
+	blake.Write(serialized[:])
+	blake.Sum(res[:0])
+	return res
 }
 
 func dataToElement(data []byte, out *num3072) {
 	var zeros12 [12]byte
-	hashed := blake2b.Sum256(data)
+	var hashed Hash
+	blake, err := blake2b.New256([]byte("MuHashElement"))
+	if err != nil {
+		panic(errors.Wrap(err, "this should never happen. MuHashElement is less than 64 bytes"))
+	}
+	blake.Write(data)
+	blake.Sum(hashed[:0])
 	stream, err := chacha20.NewUnauthenticatedCipher(hashed[:], zeros12[:])
 	if err != nil {
 		panic(err)
